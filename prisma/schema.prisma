@@ -9,19 +9,24 @@ datasource db {
 }
 
 model User {
-  id          String   @id @default(cuid())
-  firebaseUid String   @unique
-  email       String   @unique
-  displayName String?
-  avatarUrl   String?
-  isActive    Boolean  @default(true)
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  id            String   @id @default(cuid())
+  firebaseUid   String?  @unique
+  email         String   @unique
+  emailVerified Boolean  @default(false)
+  pseudonym     String   @unique
+  realName      String?
+  displayName   String?
+  avatarUrl     String?
+  isActive      Boolean  @default(true)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
 
-  userRoles UserRole[]
-  comments  Comment[]
-  auditLogs AuditLog[]
-  sessions  AnalyticsSession[]
+  linkedAccounts LinkedAuthAccount[]
+  userRoles      UserRole[]
+  comments       Comment[]
+  commentVotes   CommentVote[]
+  auditLogs      AuditLog[]
+  sessions       AnalyticsSession[]
 }
 
 model Role {
@@ -81,8 +86,38 @@ model Comment {
   user    User      @relation(fields: [userId], references: [id])
   parent  Comment?  @relation("CommentThread", fields: [parentId], references: [id])
   replies Comment[] @relation("CommentThread")
+  votes   CommentVote[]
 
   @@index([entityType, entityId])
+}
+
+model CommentVote {
+  id        String   @id @default(cuid())
+  userId    String
+  commentId String
+  value     Int
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  comment Comment @relation(fields: [commentId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, commentId])
+}
+
+model LinkedAuthAccount {
+  id             String   @id @default(cuid())
+  userId         String
+  provider       String
+  providerUserId String
+  email          String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerUserId])
+  @@index([userId, provider])
 }
 
 model AnalyticsSession {

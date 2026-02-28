@@ -6,7 +6,7 @@ export default function RegisterPage() {
     <main className="mx-auto flex min-h-screen max-w-4xl items-center justify-center px-6 py-12">
       <div className="w-full max-w-md space-y-4">
         <RegisterForm />
-        <p className="text-center text-sm text-zinc-500">
+        <p className="text-center text-sm text-[var(--muted-foreground)]">
           Already have an account?{" "}
           <Link className="underline" href="/login">
             Sign in

@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { createUserWithEmailAndPassword, updateProfile } from "firebase/auth";
+import { createUserWithEmailAndPassword, sendEmailVerification, signOut, updateProfile } from "firebase/auth";
 import { useRouter } from "next/navigation";
 import { getFirebaseAuthClient } from "@/lib/firebase/client";
 import { Button } from "@/components/ui/button";
@@ -15,36 +15,21 @@ export function RegisterForm() {
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-
-  const toErrorMessage = async (response: Response) => {
-    const fallback = "Could not create app session";
-    try {
-      const payload = (await response.json()) as { error?: string };
-      return payload.error || fallback;
-    } catch {
-      return fallback;
-    }
-  };
+  const [success, setSuccess] = useState<string | null>(null);
 
   const onRegister = async (event: React.FormEvent) => {
     event.preventDefault();
     setError(null);
+    setSuccess(null);
     setLoading(true);
     try {
       const firebaseAuth = getFirebaseAuthClient();
       const credentials = await createUserWithEmailAndPassword(firebaseAuth, email, password);
       await updateProfile(credentials.user, { displayName: name });
-      const idToken = await credentials.user.getIdToken();
-
-      const response = await fetch("/api/auth/session", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ idToken }),
-      });
-      if (!response.ok) throw new Error(await toErrorMessage(response));
-
-      router.replace("/dashboard");
-      router.refresh();
+      await sendEmailVerification(credentials.user);
+      await signOut(firebaseAuth);
+      setSuccess("Account created. Verify your email first, then sign in.");
+      router.replace("/login");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not create account");
     } finally {
@@ -66,11 +51,12 @@ export function RegisterForm() {
           placeholder="Password"
           required
         />
-        <Button className="w-full" disabled={loading} type="submit">
+        <Button className="w-full" data-track="auth.register.submit" disabled={loading} type="submit">
           Create Account
         </Button>
       </form>
       {error && <p className="text-sm text-red-500">{error}</p>}
+      {success && <p className="text-sm text-emerald-600 dark:text-emerald-400">{success}</p>}
     </Card>
   );
 }

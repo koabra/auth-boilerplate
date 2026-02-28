@@ -25,6 +25,8 @@ const permissionTuples = [
   ["settings", "manage"],
   ["audit_logs", "read"],
   ["profile", "manage"],
+  ["examples", "view_a"],
+  ["examples", "view_b"],
 ] as const;
 
 async function main() {
@@ -103,9 +105,10 @@ async function main() {
     "analytics:read",
     "audit_logs:read",
     "settings:read",
+    "examples:view_b",
   ]);
 
-  await grant(userRole.id, ["comments:create", "comments:read", "profile:manage"]);
+  await grant(userRole.id, ["comments:create", "comments:read", "profile:manage", "examples:view_a"]);
 
   await prisma.featureFlag.upsert({
     where: { key: "comments_enabled" },

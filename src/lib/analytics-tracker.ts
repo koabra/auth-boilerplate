@@ -1,7 +1,7 @@
 "use client";
 
 type EventPayload = {
-  eventType: "page_view" | "click" | "custom";
+  eventType: "page_view" | "click" | "custom" | "heartbeat";
   pageUrl: string;
   elementId?: string;
   elementText?: string;
@@ -35,6 +35,16 @@ async function flushEvents() {
   });
 }
 
+function flushEventsWithBeacon() {
+  if (!queue.length || typeof navigator === "undefined" || typeof navigator.sendBeacon !== "function") return;
+  const events = queue.splice(0, queue.length);
+  const payload = JSON.stringify({
+    sessionToken: getSessionToken(),
+    events,
+  });
+  navigator.sendBeacon("/api/analytics/track", payload);
+}
+
 export function trackEvent(payload: EventPayload) {
   queue.push(payload);
 }
@@ -63,6 +73,13 @@ export function initAnalyticsTracking() {
   const interval = setInterval(() => {
     void flushEvents();
   }, 5000);
+  const heartbeat = setInterval(() => {
+    trackEvent({
+      eventType: "heartbeat",
+      pageUrl: window.location.pathname,
+      metadata: { kind: "active_heartbeat" },
+    });
+  }, 30000);
 
   const visibilityHandler = () => {
     if (document.visibilityState === "hidden") {
@@ -72,7 +89,7 @@ export function initAnalyticsTracking() {
         durationMs: Date.now() - pageStart,
         metadata: { kind: "time_on_page" },
       });
-      void flushEvents();
+      flushEventsWithBeacon();
     }
   };
 
@@ -99,13 +116,14 @@ export function initAnalyticsTracking() {
       durationMs: Date.now() - pageStart,
       metadata: { kind: "time_on_page" },
     });
-    void flushEvents();
+    flushEventsWithBeacon();
   };
 
   window.addEventListener("beforeunload", unloadHandler);
 
   return () => {
     clearInterval(interval);
+    clearInterval(heartbeat);
     clearInterval(routePoll);
     document.removeEventListener("click", clickHandler);
     document.removeEventListener("visibilitychange", visibilityHandler);

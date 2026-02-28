@@ -10,25 +10,126 @@ const bodySchema = z.object({
   idToken: z.string().min(10),
 });
 
+const AUTH_PROVIDER = "firebase";
+
+function toBasePseudonym(raw: string) {
+  const normalized = raw
+    .toLowerCase()
+    .replace(/[^a-z0-9_]+/g, "_")
+    .replace(/^_+|_+$/g, "")
+    .slice(0, 24);
+  return normalized || "user";
+}
+
+function randomPseudonymSeed() {
+  return `user_${Math.random().toString(36).slice(2, 10)}`;
+}
+
+async function getUniquePseudonym(raw: string) {
+  const base = toBasePseudonym(raw);
+  const existing = await prisma.user.findUnique({
+    where: { pseudonym: base },
+    select: { id: true },
+  });
+  if (!existing) return base;
+  for (let attempt = 1; attempt <= 50; attempt += 1) {
+    const candidate = `${base}_${Math.floor(1000 + Math.random() * 9000)}`;
+    const taken = await prisma.user.findUnique({
+      where: { pseudonym: candidate },
+      select: { id: true },
+    });
+    if (!taken) return candidate;
+  }
+  return `${base}_${Date.now().toString().slice(-6)}`;
+}
+
 export async function POST(req: NextRequest) {
   try {
     const body = bodySchema.parse(await req.json());
     const decoded = await getFirebaseAdminAuth().verifyIdToken(body.idToken);
+    const provider = decoded.firebase?.sign_in_provider ?? "unknown";
+    const email = decoded.email ?? `${decoded.uid}@unknown.local`;
+    const emailVerified = Boolean(decoded.email_verified);
 
-    const user = await prisma.user.upsert({
-      where: { firebaseUid: decoded.uid },
+    const existingLink = await prisma.linkedAuthAccount.findUnique({
+      where: {
+        provider_providerUserId: {
+          provider: AUTH_PROVIDER,
+          providerUserId: decoded.uid,
+        },
+      },
+      include: { user: true },
+    });
+    let user = existingLink?.user ?? null;
+
+    if (!user) {
+      user = await prisma.user.findUnique({ where: { email } });
+    }
+
+    if (!user) {
+      user = await prisma.user.create({
+        data: {
+          firebaseUid: decoded.uid,
+          email,
+          emailVerified,
+          pseudonym: await getUniquePseudonym(decoded.name?.trim() || randomPseudonymSeed()),
+          realName: decoded.name ?? null,
+          displayName: decoded.name ?? null,
+          avatarUrl: decoded.picture ?? null,
+        },
+      });
+    } else {
+      user = await prisma.user.update({
+        where: { id: user.id },
+        data: {
+          firebaseUid: decoded.uid,
+          email,
+          emailVerified,
+          realName: user.realName ?? decoded.name ?? null,
+          displayName: decoded.name ?? user.displayName,
+          avatarUrl: decoded.picture ?? user.avatarUrl,
+        },
+      });
+    }
+
+    await prisma.linkedAuthAccount.upsert({
+      where: {
+        provider_providerUserId: {
+          provider: AUTH_PROVIDER,
+          providerUserId: decoded.uid,
+        },
+      },
       update: {
-        email: decoded.email ?? `${decoded.uid}@unknown.local`,
-        displayName: decoded.name ?? null,
-        avatarUrl: decoded.picture ?? null,
+        userId: user.id,
+        email,
       },
       create: {
-        firebaseUid: decoded.uid,
-        email: decoded.email ?? `${decoded.uid}@unknown.local`,
-        displayName: decoded.name ?? null,
-        avatarUrl: decoded.picture ?? null,
+        userId: user.id,
+        provider: AUTH_PROVIDER,
+        providerUserId: decoded.uid,
+        email,
       },
     });
+
+    if (provider === "password" && !emailVerified) {
+      return NextResponse.json(
+        {
+          error: "Please verify your email before signing in.",
+          code: "EMAIL_NOT_VERIFIED",
+        },
+        { status: 403 },
+      );
+    }
+
+    if (!user.isActive) {
+      return NextResponse.json(
+        {
+          error: "Your account has been disabled. Please contact support.",
+          code: "ACCOUNT_DISABLED",
+        },
+        { status: 403 },
+      );
+    }
 
     const userRole = await prisma.role.findUnique({ where: { name: "user" } });
     if (userRole) {
@@ -53,7 +154,6 @@ export async function POST(req: NextRequest) {
     const { roles } = await getUserRolesAndPermissions(user.id);
     const token = await createSessionToken({
       userId: user.id,
-      firebaseUid: user.firebaseUid,
       email: user.email,
       roles,
     });

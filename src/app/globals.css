@@ -1,18 +1,48 @@
 @import "tailwindcss";
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --background: #f6f8fc;
+  --foreground: #0f172a;
+  --surface: #ffffff;
+  --surface-2: #f1f5f9;
+  --panel: #eef2ff;
+  --panel-foreground: #1e293b;
+  --border: #d9e2ef;
+  --muted: #64748b;
+  --muted-foreground: #475569;
+  --accent: #4f46e5;
+  --accent-foreground: #ffffff;
+  --ring: #818cf8;
 }
 
 .dark {
-  --background: #09090b;
-  --foreground: #fafafa;
+  --background: #020617;
+  --foreground: #e6edf7;
+  --surface: #0b1220;
+  --surface-2: #162033;
+  --panel: #0f1a2f;
+  --panel-foreground: #d8e3f2;
+  --border: #334155;
+  --muted: #a0aec0;
+  --muted-foreground: #c2cfdf;
+  --accent: #6366f1;
+  --accent-foreground: #eef2ff;
+  --ring: #a5b4fc;
 }
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
+  --color-surface: var(--surface);
+  --color-surface-2: var(--surface-2);
+  --color-panel: var(--panel);
+  --color-panel-foreground: var(--panel-foreground);
+  --color-border: var(--border);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-ring: var(--ring);
   --font-sans: Arial, Helvetica, sans-serif;
   --font-mono: monospace;
 }

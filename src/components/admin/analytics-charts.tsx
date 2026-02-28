@@ -38,27 +38,37 @@ export function AnalyticsCharts() {
       </div>
       <Card className="h-72">
         <p className="mb-3 text-sm font-medium">Top pages</p>
-        <ResponsiveContainer width="100%" height="90%">
-          <BarChart data={data.topPages}>
-            <CartesianGrid strokeDasharray="3 3" />
-            <XAxis dataKey="pageUrl" />
-            <YAxis />
-            <Tooltip />
-            <Bar dataKey="count" fill="#2563eb" />
-          </BarChart>
-        </ResponsiveContainer>
+        {data.topPages.length ? (
+          <ResponsiveContainer width="100%" height="90%">
+            <BarChart data={data.topPages}>
+              <CartesianGrid strokeDasharray="3 3" />
+              <XAxis dataKey="pageUrl" />
+              <YAxis />
+              <Tooltip />
+              <Bar dataKey="count" fill="#2563eb" />
+            </BarChart>
+          </ResponsiveContainer>
+        ) : (
+          <p className="text-sm text-[var(--muted-foreground)]">No page-view data captured yet.</p>
+        )}
       </Card>
       <Card className="h-72">
         <p className="mb-3 text-sm font-medium">Top clicks</p>
-        <ResponsiveContainer width="100%" height="90%">
-          <BarChart data={data.topClicks}>
-            <CartesianGrid strokeDasharray="3 3" />
-            <XAxis dataKey="elementId" />
-            <YAxis />
-            <Tooltip />
-            <Bar dataKey="count" fill="#16a34a" />
-          </BarChart>
-        </ResponsiveContainer>
+        {data.topClicks.length ? (
+          <ResponsiveContainer width="100%" height="90%">
+            <BarChart data={data.topClicks}>
+              <CartesianGrid strokeDasharray="3 3" />
+              <XAxis dataKey="elementId" />
+              <YAxis />
+              <Tooltip />
+              <Bar dataKey="count" fill="#16a34a" />
+            </BarChart>
+          </ResponsiveContainer>
+        ) : (
+          <p className="text-sm text-[var(--muted-foreground)]">
+            No click data yet. Add <code>data-track</code> attributes to interactive elements.
+          </p>
+        )}
       </Card>
     </div>
   );

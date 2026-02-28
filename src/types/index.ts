@@ -7,7 +7,6 @@ export type AppPermission = {
 
 export type SessionPayload = {
   userId: string;
-  firebaseUid: string;
   email: string;
   roles: AppRole[];
 };

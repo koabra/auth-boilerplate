@@ -8,19 +8,23 @@ export default function Home() {
       <Card className="w-full space-y-6">
         <div className="space-y-2">
           <h1 className="text-3xl font-bold">Auth Boilerplate</h1>
-          <p className="text-zinc-600 dark:text-zinc-300">
+          <p className="text-[var(--muted-foreground)]">
             Firebase auth, RBAC, comments, analytics, and admin controls in one starter.
           </p>
         </div>
         <div className="flex gap-3">
           <Link href="/login">
-            <Button>Login</Button>
+            <Button data-track="home.login">Login</Button>
           </Link>
           <Link href="/register">
-            <Button variant="outline">Register</Button>
+            <Button data-track="home.register" variant="outline">
+              Register
+            </Button>
           </Link>
           <Link href="/dashboard">
-            <Button variant="secondary">Dashboard</Button>
+            <Button data-track="home.dashboard" variant="secondary">
+              Dashboard
+            </Button>
           </Link>
         </div>
       </Card>

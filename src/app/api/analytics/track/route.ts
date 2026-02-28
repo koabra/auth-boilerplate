@@ -6,7 +6,7 @@ import { getSessionFromCookies } from "@/lib/session";
 import { isFeatureEnabled } from "@/lib/feature-flags";
 
 const eventSchema = z.object({
-  eventType: z.enum(["page_view", "click", "custom"]),
+  eventType: z.enum(["page_view", "click", "custom", "heartbeat"]),
   pageUrl: z.string(),
   elementId: z.string().optional(),
   elementText: z.string().optional(),

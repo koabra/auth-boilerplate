@@ -5,6 +5,7 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useState } 
 type UserShape = {
   id: string;
   email: string;
+  pseudonym: string;
   displayName: string | null;
   roles: string[];
   permissions: Array<{ resource: string; action: string }>;

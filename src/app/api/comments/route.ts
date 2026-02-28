@@ -6,7 +6,14 @@ import { hasPermission } from "@/lib/permissions";
 import { isFeatureEnabled } from "@/lib/feature-flags";
 import { writeAuditLog } from "@/lib/audit";
 
-export const GET = withAuth(async ({ req }) => {
+const MAX_COMMENT_DEPTH = 4;
+type ParentCommentRef = {
+  parentId: string | null;
+  entityType: string;
+  entityId: string;
+};
+
+export const GET = withAuth(async ({ req, session }) => {
   const enabled = await isFeatureEnabled("comments_enabled");
   if (!enabled) {
     return NextResponse.json({ error: "Comments are disabled" }, { status: 403 });
@@ -22,13 +29,20 @@ export const GET = withAuth(async ({ req }) => {
     where: { entityType, entityId },
     include: {
       user: {
-        select: { email: true, displayName: true },
+        select: { email: true, displayName: true, pseudonym: true },
       },
+      votes: true,
     },
     orderBy: { createdAt: "asc" },
   });
 
-  return NextResponse.json({ comments });
+  return NextResponse.json({
+    comments: comments.map((comment) => ({
+      ...comment,
+      score: comment.votes.reduce((acc, vote) => acc + vote.value, 0),
+      myVote: comment.votes.find((vote) => vote.userId === session.userId)?.value ?? 0,
+    })),
+  });
 });
 
 const postSchema = z.object({
@@ -46,10 +60,35 @@ export const POST = withAuth(async ({ req, session }) => {
 
   const canCreate = await hasPermission(session.userId, "comments", "create");
   if (!canCreate) {
-    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    return NextResponse.json({ error: "You do not have permission to post comments" }, { status: 403 });
   }
 
   const payload = postSchema.parse(await req.json());
+  if (payload.parentId) {
+    let parentDepth = 0;
+    let currentParentId: string | null = payload.parentId;
+
+    while (currentParentId) {
+      const parent: ParentCommentRef | null = await prisma.comment.findUnique({
+        where: { id: currentParentId },
+        select: { parentId: true, entityType: true, entityId: true },
+      });
+      if (!parent) {
+        return NextResponse.json({ error: "Parent comment not found" }, { status: 404 });
+      }
+      if (parent.entityType !== payload.entityType || parent.entityId !== payload.entityId) {
+        return NextResponse.json({ error: "Parent comment does not belong to this thread" }, { status: 400 });
+      }
+
+      currentParentId = parent.parentId;
+      parentDepth += 1;
+    }
+
+    if (parentDepth > MAX_COMMENT_DEPTH) {
+      return NextResponse.json({ error: `Replies are limited to ${MAX_COMMENT_DEPTH} levels` }, { status: 400 });
+    }
+  }
+
   const comment = await prisma.comment.create({
     data: {
       userId: session.userId,

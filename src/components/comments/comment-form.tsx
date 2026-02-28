@@ -13,18 +13,46 @@ type CommentFormProps = {
 
 export function CommentForm({ entityType, entityId, parentId, onSuccess }: CommentFormProps) {
   const [content, setContent] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const toErrorMessage = async (response: Response) => {
+    try {
+      const payload = (await response.json()) as { error?: string };
+      if (payload.error) return payload.error;
+    } catch {
+      // Ignore parse errors and fallback to status-based messaging.
+    }
+
+    if (response.status === 403) {
+      return "You do not have permission to post comments";
+    }
+
+    return "Could not post comment";
+  };
 
   const submit = async (event: React.FormEvent) => {
     event.preventDefault();
     if (!content.trim()) return;
+    setError(null);
+    setSubmitting(true);
 
-    await fetch("/api/comments", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ entityType, entityId, parentId, content }),
-    });
-    setContent("");
-    onSuccess?.();
+    try {
+      const response = await fetch("/api/comments", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ entityType, entityId, parentId, content }),
+      });
+      if (!response.ok) {
+        throw new Error(await toErrorMessage(response));
+      }
+      setContent("");
+      onSuccess?.();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not post comment");
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   return (
@@ -35,9 +63,10 @@ export function CommentForm({ entityType, entityId, parentId, onSuccess }: Comme
         required
         value={content}
       />
-      <Button size="sm" type="submit">
+      <Button data-track="comments.post" size="sm" type="submit" disabled={submitting}>
         Post comment
       </Button>
+      {error ? <p className="text-sm text-red-500">{error}</p> : null}
     </form>
   );
 }

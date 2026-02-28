@@ -1,8 +1,16 @@
 "use client";
 
-import { useState } from "react";
-import { GoogleAuthProvider, signInWithEmailAndPassword, signInWithPopup } from "firebase/auth";
+import { useCallback, useEffect, useState } from "react";
+import {
+  getRedirectResult,
+  GoogleAuthProvider,
+  signInWithEmailAndPassword,
+  signInWithPopup,
+  signInWithRedirect,
+  signOut,
+} from "firebase/auth";
 import { useRouter } from "next/navigation";
+import { useAuth } from "@/components/providers/auth-provider";
 import { getFirebaseAuthClient } from "@/lib/firebase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -10,6 +18,7 @@ import { Card } from "@/components/ui/card";
 
 export function LoginForm() {
   const router = useRouter();
+  const { refresh } = useAuth();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
@@ -25,7 +34,7 @@ export function LoginForm() {
     }
   };
 
-  const createServerSession = async () => {
+  const createServerSession = useCallback(async () => {
     const firebaseAuth = getFirebaseAuthClient();
     const firebaseUser = firebaseAuth.currentUser;
     if (!firebaseUser) return;
@@ -35,10 +44,40 @@ export function LoginForm() {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ idToken }),
     });
-    if (!response.ok) throw new Error(await toErrorMessage(response));
+    if (!response.ok) {
+      const message = await toErrorMessage(response);
+      if (message.includes("verify your email") || message.includes("disabled")) {
+        await signOut(firebaseAuth);
+      }
+      throw new Error(message);
+    }
+    await refresh();
     router.replace("/dashboard");
     router.refresh();
+  }, [refresh, router]);
+
+  const isMobileBrowser = () => {
+    if (typeof navigator === "undefined") return false;
+    return /android|iphone|ipad|ipod|mobile/i.test(navigator.userAgent);
   };
+
+  useEffect(() => {
+    const finalizeRedirectSignIn = async () => {
+      setLoading(true);
+      try {
+        const firebaseAuth = getFirebaseAuthClient();
+        const result = await getRedirectResult(firebaseAuth);
+        if (result?.user) {
+          await createServerSession();
+        }
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "Google sign-in failed");
+      } finally {
+        setLoading(false);
+      }
+    };
+    void finalizeRedirectSignIn();
+  }, [createServerSession]);
 
   const onEmailLogin = async (event: React.FormEvent) => {
     event.preventDefault();
@@ -60,7 +99,12 @@ export function LoginForm() {
     setLoading(true);
     try {
       const firebaseAuth = getFirebaseAuthClient();
-      await signInWithPopup(firebaseAuth, new GoogleAuthProvider());
+      const provider = new GoogleAuthProvider();
+      if (isMobileBrowser()) {
+        await signInWithRedirect(firebaseAuth, provider);
+        return;
+      }
+      await signInWithPopup(firebaseAuth, provider);
       await createServerSession();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Google sign-in failed");
@@ -81,11 +125,18 @@ export function LoginForm() {
           placeholder="Password"
           required
         />
-        <Button className="w-full" disabled={loading} type="submit">
+        <Button className="w-full" data-track="auth.login.email.submit" disabled={loading} type="submit">
           Continue with Email
         </Button>
       </form>
-      <Button className="w-full" variant="secondary" disabled={loading} onClick={onGoogleLogin} type="button">
+      <Button
+        className="w-full"
+        data-track="auth.login.google.submit"
+        variant="secondary"
+        disabled={loading}
+        onClick={onGoogleLogin}
+        type="button"
+      >
         Continue with Google
       </Button>
       {error && <p className="text-sm text-red-500">{error}</p>}

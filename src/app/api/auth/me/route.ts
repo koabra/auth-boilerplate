@@ -13,6 +13,9 @@ export async function GET() {
   if (!user) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
+  if (!user.isActive) {
+    return NextResponse.json({ error: "Account disabled", code: "ACCOUNT_DISABLED" }, { status: 403 });
+  }
 
   const { roles, permissions } = await getUserRolesAndPermissions(user.id);
 
@@ -20,6 +23,7 @@ export async function GET() {
     user: {
       id: user.id,
       email: user.email,
+      pseudonym: user.pseudonym,
       displayName: user.displayName,
       roles,
       permissions,
