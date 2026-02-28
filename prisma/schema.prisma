@@ -1,0 +1,141 @@
+generator client {
+  provider      = "prisma-client-js"
+  binaryTargets = ["native", "linux-musl-arm64-openssl-3.0.x"]
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id          String   @id @default(cuid())
+  firebaseUid String   @unique
+  email       String   @unique
+  displayName String?
+  avatarUrl   String?
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  userRoles UserRole[]
+  comments  Comment[]
+  auditLogs AuditLog[]
+  sessions  AnalyticsSession[]
+}
+
+model Role {
+  id          String   @id @default(cuid())
+  name        String   @unique
+  displayName String
+  description String?
+  isSystem    Boolean  @default(false)
+  createdAt   DateTime @default(now())
+
+  rolePermissions RolePermission[]
+  userRoles       UserRole[]
+}
+
+model Permission {
+  id          String @id @default(cuid())
+  resource    String
+  action      String
+  description String?
+
+  rolePermissions RolePermission[]
+
+  @@unique([resource, action])
+}
+
+model RolePermission {
+  roleId       String
+  permissionId String
+  role         Role       @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  permission   Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+
+  @@id([roleId, permissionId])
+}
+
+model UserRole {
+  userId     String
+  roleId     String
+  assignedAt DateTime @default(now())
+  assignedBy String?
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role       Role     @relation(fields: [roleId], references: [id], onDelete: Cascade)
+
+  @@id([userId, roleId])
+}
+
+model Comment {
+  id         String    @id @default(cuid())
+  userId     String
+  entityType String
+  entityId   String
+  parentId   String?
+  content    String
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+  deletedAt  DateTime?
+
+  user    User      @relation(fields: [userId], references: [id])
+  parent  Comment?  @relation("CommentThread", fields: [parentId], references: [id])
+  replies Comment[] @relation("CommentThread")
+
+  @@index([entityType, entityId])
+}
+
+model AnalyticsSession {
+  id           String    @id @default(cuid())
+  userId       String?
+  sessionToken String    @unique
+  ipAddress    String?
+  userAgent    String?
+  referrer     String?
+  startedAt    DateTime  @default(now())
+  endedAt      DateTime?
+
+  user   User?            @relation(fields: [userId], references: [id])
+  events AnalyticsEvent[]
+}
+
+model AnalyticsEvent {
+  id          String   @id @default(cuid())
+  sessionId   String
+  eventType   String
+  pageUrl     String
+  elementId   String?
+  elementText String?
+  metadata    Json?
+  durationMs  Int?
+  createdAt   DateTime @default(now())
+
+  session AnalyticsSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+  @@index([eventType, createdAt])
+  @@index([pageUrl])
+}
+
+model FeatureFlag {
+  id          String   @id @default(cuid())
+  key         String   @unique
+  description String?
+  isEnabled   Boolean  @default(false)
+  updatedAt   DateTime @updatedAt
+}
+
+model AuditLog {
+  id           String   @id @default(cuid())
+  userId       String?
+  action       String
+  resourceType String
+  resourceId   String?
+  metadata     Json?
+  ipAddress    String?
+  createdAt    DateTime @default(now())
+
+  user User? @relation(fields: [userId], references: [id])
+
+  @@index([action, createdAt])
+  @@index([resourceType, resourceId])
+}
