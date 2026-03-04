@@ -26,6 +26,11 @@ export default function Home() {
               Dashboard
             </Button>
           </Link>
+          <Link href="/pricing">
+            <Button data-track="home.pricing" variant="outline">
+              Pricing
+            </Button>
+          </Link>
         </div>
       </Card>
     </main>

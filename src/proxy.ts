@@ -5,7 +5,7 @@ const publicPaths = ["/", "/login", "/register"];
 const adminPrefix = "/dashboard/admin";
 const protectedPrefix = "/dashboard";
 
-export async function middleware(req: NextRequest) {
+export async function proxy(req: NextRequest) {
   const { pathname } = req.nextUrl;
   const token = req.cookies.get(getSessionCookieName())?.value;
   const session = token ? await verifySessionToken(token) : null;

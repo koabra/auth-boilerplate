@@ -19,6 +19,7 @@ const links: LinkPolicy[] = [
   { href: "/dashboard", label: "Dashboard", roles: ["user", "admin", "super_user"] },
   { href: "/dashboard/profile", label: "Profile", permission: { resource: "profile", action: "manage" } },
   { href: "/dashboard/comments", label: "Comments", permission: { resource: "comments", action: "read" } },
+  { href: "/dashboard/billing", label: "Billing", permission: { resource: "billing", action: "read" } },
   { href: "/dashboard/role-a", label: "Role A Demo", permission: { resource: "examples", action: "view_a" } },
   { href: "/dashboard/role-b", label: "Role B Demo", permission: { resource: "examples", action: "view_b" } },
   { href: "/dashboard/admin/users", label: "Users", permission: { resource: "users", action: "read" } },

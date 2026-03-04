@@ -1,4 +1,4 @@
-import { PrismaClient } from "@prisma/client";
+import { BillingInterval, PlanTier, PrismaClient } from "@prisma/client";
 
 const prisma = new PrismaClient();
 
@@ -24,6 +24,8 @@ const permissionTuples = [
   ["settings", "read"],
   ["settings", "manage"],
   ["audit_logs", "read"],
+  ["billing", "read"],
+  ["billing", "manage"],
   ["profile", "manage"],
   ["examples", "view_a"],
   ["examples", "view_b"],
@@ -104,11 +106,192 @@ async function main() {
     "comments:manage",
     "analytics:read",
     "audit_logs:read",
+    "billing:read",
     "settings:read",
     "examples:view_b",
   ]);
 
-  await grant(userRole.id, ["comments:create", "comments:read", "profile:manage", "examples:view_a"]);
+  await grant(userRole.id, [
+    "comments:create",
+    "comments:read",
+    "profile:manage",
+    "billing:read",
+    "examples:view_a",
+  ]);
+
+  const freePlan = await prisma.plan.upsert({
+    where: { tier: PlanTier.FREE },
+    update: {
+      name: "Free",
+      description: "Core features for getting started",
+      features: ["Basic auth", "RBAC", "Comments", "Community support"],
+      trialDays: 0,
+      isActive: true,
+      sortOrder: 1,
+    },
+    create: {
+      tier: PlanTier.FREE,
+      name: "Free",
+      description: "Core features for getting started",
+      features: ["Basic auth", "RBAC", "Comments", "Community support"],
+      trialDays: 0,
+      isActive: true,
+      sortOrder: 1,
+    },
+  });
+
+  const proPlan = await prisma.plan.upsert({
+    where: { tier: PlanTier.PRO },
+    update: {
+      name: "Pro",
+      description: "For teams building production apps",
+      features: ["Everything in Free", "Priority support", "Advanced analytics", "Audit tools"],
+      trialDays: 7,
+      isActive: true,
+      sortOrder: 2,
+    },
+    create: {
+      tier: PlanTier.PRO,
+      name: "Pro",
+      description: "For teams building production apps",
+      features: ["Everything in Free", "Priority support", "Advanced analytics", "Audit tools"],
+      trialDays: 7,
+      isActive: true,
+      sortOrder: 2,
+    },
+  });
+
+  const enterprisePlan = await prisma.plan.upsert({
+    where: { tier: PlanTier.ENTERPRISE },
+    update: {
+      name: "Enterprise",
+      description: "For scale, security, and dedicated support",
+      features: ["Everything in Pro", "Custom SSO", "Dedicated support", "SLA and compliance"],
+      trialDays: 7,
+      isActive: true,
+      sortOrder: 3,
+    },
+    create: {
+      tier: PlanTier.ENTERPRISE,
+      name: "Enterprise",
+      description: "For scale, security, and dedicated support",
+      features: ["Everything in Pro", "Custom SSO", "Dedicated support", "SLA and compliance"],
+      trialDays: 7,
+      isActive: true,
+      sortOrder: 3,
+    },
+  });
+
+  const upsertPrice = async ({
+    planId,
+    interval,
+    amount,
+    provider,
+    providerPriceId,
+  }: {
+    planId: string;
+    interval: BillingInterval;
+    amount: number;
+    provider: string;
+    providerPriceId?: string;
+  }) => {
+    await prisma.planPrice.upsert({
+      where: {
+        planId_interval_provider: {
+          planId,
+          interval,
+          provider,
+        },
+      },
+      update: {
+        amount,
+        currency: "usd",
+        providerPriceId: providerPriceId ?? null,
+      },
+      create: {
+        planId,
+        interval,
+        amount,
+        currency: "usd",
+        provider,
+        providerPriceId: providerPriceId ?? null,
+      },
+    });
+  };
+
+  await upsertPrice({
+    planId: freePlan.id,
+    interval: BillingInterval.MONTHLY,
+    amount: 0,
+    provider: "default",
+  });
+  await upsertPrice({
+    planId: freePlan.id,
+    interval: BillingInterval.YEARLY,
+    amount: 0,
+    provider: "default",
+  });
+  await upsertPrice({
+    planId: proPlan.id,
+    interval: BillingInterval.MONTHLY,
+    amount: 1900,
+    provider: "default",
+  });
+  await upsertPrice({
+    planId: proPlan.id,
+    interval: BillingInterval.YEARLY,
+    amount: 19000,
+    provider: "default",
+  });
+  await upsertPrice({
+    planId: enterprisePlan.id,
+    interval: BillingInterval.MONTHLY,
+    amount: 4900,
+    provider: "default",
+  });
+  await upsertPrice({
+    planId: enterprisePlan.id,
+    interval: BillingInterval.YEARLY,
+    amount: 49000,
+    provider: "default",
+  });
+
+  if (process.env.STRIPE_PRICE_PRO_MONTHLY) {
+    await upsertPrice({
+      planId: proPlan.id,
+      interval: BillingInterval.MONTHLY,
+      amount: 1900,
+      provider: "stripe",
+      providerPriceId: process.env.STRIPE_PRICE_PRO_MONTHLY,
+    });
+  }
+  if (process.env.STRIPE_PRICE_PRO_YEARLY) {
+    await upsertPrice({
+      planId: proPlan.id,
+      interval: BillingInterval.YEARLY,
+      amount: 19000,
+      provider: "stripe",
+      providerPriceId: process.env.STRIPE_PRICE_PRO_YEARLY,
+    });
+  }
+  if (process.env.STRIPE_PRICE_ENTERPRISE_MONTHLY) {
+    await upsertPrice({
+      planId: enterprisePlan.id,
+      interval: BillingInterval.MONTHLY,
+      amount: 4900,
+      provider: "stripe",
+      providerPriceId: process.env.STRIPE_PRICE_ENTERPRISE_MONTHLY,
+    });
+  }
+  if (process.env.STRIPE_PRICE_ENTERPRISE_YEARLY) {
+    await upsertPrice({
+      planId: enterprisePlan.id,
+      interval: BillingInterval.YEARLY,
+      amount: 49000,
+      provider: "stripe",
+      providerPriceId: process.env.STRIPE_PRICE_ENTERPRISE_YEARLY,
+    });
+  }
 
   await prisma.featureFlag.upsert({
     where: { key: "comments_enabled" },
